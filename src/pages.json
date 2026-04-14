@@ -1,0 +1,51 @@
+{
+  "pages": [
+    {
+      "path": "pages/index",
+      "style": {
+        "navigationBarTitleText": "豆医 - 豆音笔记诊断工具",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black",
+        "backgroundColor": "#faf9f7"
+      }
+    },
+    {
+      "path": "pages/diagnosing",
+      "style": {
+        "navigationBarTitleText": "诊断中 - 豆医",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black",
+        "backgroundColor": "#faf9f7"
+      }
+    },
+    {
+      "path": "pages/report",
+      "style": {
+        "navigationBarTitleText": "诊断报告 - 豆医",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black",
+        "backgroundColor": "#faf9f7"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "豆医",
+    "navigationBarBackgroundColor": "#ffffff",
+    "backgroundColor": "#faf9f7"
+  },
+  "tabBar": {
+    "color": "#999999",
+    "selectedColor": "#ff2442",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index",
+        "text": "首页",
+        "iconPath": "static/icon-home.png",
+        "selectedIconPath": "static/icon-home-active.png"
+      }
+    ]
+  }
+}
