@@ -131,6 +131,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { onLoad } from '@dcloudio/uni-app';
+import { diagnoseNote } from '@/api/diagnose.js'; //新增的调用
 // 状态管理
 const params = ref<any>(null);
 
@@ -300,61 +301,42 @@ const goBack = () => {
     }
   });
 };
+// 真实 AI 诊断调用
+const startAIDiagnosis = async (params: any) => {
+  try {
+    // 构造传给 AI 的数据
+    const diagnoseData = {
+      title: params.title,
+      content: params.content,
+      category: params.category,
+      coverFilePath: params.coverFilePath || (params.coverImages && params.coverImages[0]?.path) || ''
+    };
 
-// 模拟预评分
-const preScore = async (params: any): Promise<any> => {
-  // 模拟 API 调用
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        total_score: 85,
-        dimensions: {
-          title_quality: 90,
-          content_quality: 85,
-          visual_quality: 80,
-          tag_strategy: 85,
-          engagement_potential: 88
-        },
-        level: "优秀",
-        category: params.category,
-        category_cn: "美食"
-      });
-    }, 1000);
-  });
-};
+    // 调用后端 API
+    const aiResult = await diagnoseNote(diagnoseData);
 
-// 模拟诊断流
-const diagnoseStream = async (params: any, onEvent: (event: any) => void) => {
-  // 模拟 SSE 流
-  const events = [
-    { type: "pre_score", data: { total_score: 85, dimensions: { title_quality: 90, content_quality: 85, visual_quality: 80, tag_strategy: 85, engagement_potential: 88 }, level: "优秀", category: params.category, category_cn: "美食" } },
-    { type: "progress", data: { step: "parse_start", message: "开始解析笔记内容" } },
-    { type: "progress", data: { step: "parse_done", message: "笔记内容解析完成" } },
-    { type: "progress", data: { step: "baseline_start", message: "开始对比垂类数据" } },
-    { type: "progress", data: { step: "baseline_done", message: "垂类数据对比完成" } },
-    { type: "progress", data: { step: "round1_start", message: "开始第一轮诊断" } },
-    { type: "progress", data: { step: "round1_content_done", message: "内容分析师诊断完成" } },
-    { type: "progress", data: { step: "round1_visual_done", message: "视觉诊断师诊断完成" } },
-    { type: "progress", data: { step: "round1_growth_done", message: "增长策略师诊断完成" } },
-    { type: "progress", data: { step: "round1_user_done", message: "用户模拟器运行完成" } },
-    { type: "progress", data: { step: "round1_done", message: "第一轮诊断完成" } },
-    { type: "progress", data: { step: "debate_start", message: "开始 Agent 辩论" } },
-    { type: "progress", data: { step: "debate_agent_0", message: "内容分析师：标题吸引力强，但正文结构可以优化" } },
-    { type: "progress", data: { step: "debate_agent_1", message: "视觉诊断师：封面构图合理，色彩搭配协调" } },
-    { type: "progress", data: { step: "debate_agent_2", message: "增长策略师：标签选择精准，建议增加1-2个热门标签" } },
-    { type: "progress", data: { step: "debate_agent_3", message: "用户模拟器：用户反应积极，预计互动率较高" } },
-    { type: "progress", data: { step: "debate_done", message: "Agent 辩论完成" } },
-    { type: "progress", data: { step: "judge_start", message: "综合裁判开始评定" } },
-    { type: "progress", data: { step: "judge_done", message: "综合裁判评定完成" } },
-    { type: "progress", data: { step: "finalizing", message: "正在生成诊断报告" } },
-    { type: "result", data: { overall_score: 85, grade: "优秀", radar_data: {}, agent_opinions: [], issues: [], suggestions: [], debate_summary: "", debate_timeline: [], simulated_comments: [] } }
-  ];
+    // 用 AI 返回的数据更新预评分显示
+    preScoreData.value = {
+      total_score: aiResult.overall_score,
+      dimensions: aiResult.dimensions,
+      level: aiResult.grade,
+      category: params.category,
+      category_cn: params.category // 可根据需要映射中文名
+    };
+    step.value = 1;
 
-  for (const event of events) {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    onEvent(event);
+    // 保存完整报告结果
+    resultRef.value = { report: aiResult, isFallback: false };
+    apiDone.value = true;
+
+  } catch (error: any) {
+    console.error('AI诊断失败:', error);
+    terminalError.value = 'AI服务暂时不可用，请稍后重试';
+    apiDone.value = true;
   }
 };
+
+
 
 // 生命周期
 onMounted(() => {
@@ -364,67 +346,9 @@ onMounted(() => {
   uni.redirectTo({ url: '/pages/index/index' });
   return;
 }
+// 启动真实 AI 诊断
+startAIDiagnosis(params.value);
 
-  // 阶段 1: 即时预评分
-  preScore(params.value).then((ps) => {
-    preScoreData.value = ps;
-    step.value = 1; // 移动到"数据预评分"之后
-  }).catch(() => {});
-
-  // 阶段 2: 通过 SSE 流进行完整诊断
-  (async () => {
-    try {
-      await diagnoseStream(
-        {
-          title: params.value.title,
-          content: params.value.content,
-          category: params.value.category,
-          tags: params.value.tags,
-          coverImage: params.value.coverFile || undefined,
-          coverImages: params.value.coverImages || undefined,
-          videoFile: params.value.videoFile || undefined,
-        },
-        (event: any) => {
-          if (event.type === "pre_score") {
-            preScoreData.value = event.data;
-            step.value = 1;
-          } else if (event.type === "progress") {
-            hasRealtimeProgress.value = true;
-            streamMsg.value = event.data.message;
-            const mapped = EVENT_STEP_MAP[event.data.step];
-            if (mapped !== undefined) {
-              step.value = Math.max(step.value, mapped);
-            }
-            if (event.data.step?.startsWith("debate_agent_")) {
-              debateMsgs.value = [...debateMsgs.value, event.data.message];
-            }
-          } else if (event.type === "result") {
-            resultRef.value = { report: event.data, isFallback: false };
-            apiDone.value = true;
-          } else if (event.type === "error") {
-            const msg = typeof event.data?.message === "string" ? event.data.message : "服务端诊断失败";
-            terminalError.value = msg;
-            apiDone.value = true;
-          }
-        }
-      );
-
-      if (!resultRef.value) {
-        // 降级到普通请求
-        resultRef.value = { report: {}, isFallback: false };
-      }
-    } catch (err) {
-      console.warn("SSE 不可用，降级到普通请求", err);
-      try {
-        // 模拟普通请求
-        resultRef.value = { report: {}, isFallback: false };
-      } catch (e2) {
-        let msg = "诊断请求失败，请检查网络与后端是否已启动";
-        terminalError.value = msg;
-      }
-    }
-    apiDone.value = true;
-  })();
 
   // 步骤计时器（填补真实事件之间的空白）
   const stepTimer = setInterval(() => {

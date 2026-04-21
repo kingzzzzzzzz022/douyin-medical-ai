@@ -121,6 +121,15 @@
         <button class="action-button secondary" @click="goBack">返回首页</button>
       </view>
     </view>
+    </view>
+  
+  <!-- 隐藏的画布，用于生成分享图片 -->
+  <view class="share-canvas-container">
+    <canvas 
+      canvas-id="shareCanvas" 
+      id="shareCanvas"
+      class="share-canvas"
+    ></canvas>
   </view>
 </template>
 
@@ -240,11 +249,138 @@ const shareReport = () => {
   });
 };
 
+// 保存报告为图片
 const saveReport = () => {
-  // 模拟保存功能
-  uni.showToast({
-    title: '报告已保存',
-    icon: 'success'
+  uni.showLoading({ title: '生成报告中...' });
+  
+  // 获取报告数据
+  const reportData = report.value;
+  const paramsData = params.value;
+  
+  if (!reportData || !paramsData) {
+    uni.hideLoading();
+    uni.showToast({ title: '报告数据不完整', icon: 'none' });
+    return;
+  }
+  
+  // 创建画布上下文
+  const ctx = uni.createCanvasContext('shareCanvas');
+  
+  // 设置背景
+  ctx.setFillStyle('#ffffff');
+  ctx.fillRect(0, 0, 375, 600);
+  
+  // 绘制标题
+  ctx.setFillStyle('#1a1a1a');
+  ctx.setFontSize(18);
+  ctx.font = 'bold 18px sans-serif';
+  ctx.fillText('豆医 · 诊断报告', 20, 40);
+  
+  // 绘制笔记标题
+  ctx.setFontSize(14);
+  ctx.font = 'normal 14px sans-serif';
+  ctx.setFillStyle('#666666');
+  ctx.fillText(paramsData.title || '未命名笔记', 20, 70);
+  
+  // 绘制总分
+  ctx.setFillStyle('#00BFFF');
+  ctx.setFontSize(36);
+  ctx.font = 'bold 36px sans-serif';
+  ctx.fillText(String(reportData.overall_score || 0), 20, 130);
+  
+  ctx.setFontSize(14);
+  ctx.setFillStyle('#666666');
+  ctx.fillText('综合评分', 20, 155);
+  
+  // 绘制等级
+  ctx.setFillStyle('#00BFFF');
+  ctx.setFontSize(16);
+  ctx.fillText(reportData.grade || '--', 120, 130);
+  
+  // 绘制维度评分
+  ctx.setFillStyle('#1a1a1a');
+  ctx.setFontSize(14);
+  ctx.font = 'bold 14px sans-serif';
+  ctx.fillText('维度分析', 20, 200);
+  
+  let y = 230;
+  const dimensions = reportData.dimensions || {};
+  Object.entries(dimensions).forEach(([key, value]) => {
+    const label = {
+      '标题质量': '标题', '内容质量': '内容', '视觉表现': '视觉', '标签策略': '标签', '互动潜力': '互动'
+    }[key] || key;
+    
+    ctx.setFillStyle('#666666');
+    ctx.setFontSize(12);
+    ctx.font = 'normal 12px sans-serif';
+    ctx.fillText(`${label}: ${Math.round(Number(value))}分`, 30, y);
+    
+    // 绘制进度条
+    ctx.setFillStyle('#f0f0f0');
+    ctx.fillRect(100, y - 8, 150, 8);
+    ctx.setFillStyle('#00BFFF');
+    ctx.fillRect(100, y - 8, 150 * Number(value) / 100, 8);
+    
+    y += 25;
+  });
+  
+  // 绘制问题与建议摘要
+  y += 10;
+  ctx.setFillStyle('#1a1a1a');
+  ctx.setFontSize(14);
+  ctx.font = 'bold 14px sans-serif';
+  ctx.fillText('核心建议', 20, y);
+  
+  y += 25;
+  ctx.setFontSize(11);
+  ctx.setFillStyle('#666666');
+  const suggestions = reportData.suggestions || [];
+  suggestions.slice(0, 3).forEach((s: any) => {
+    ctx.fillText(`• ${s.description}`, 30, y);
+    y += 20;
+  });
+  
+  // 绘制底部
+  ctx.setFillStyle('#cccccc');
+  ctx.setFontSize(10);
+  ctx.fillText('由豆医 AI 生成 · 仅供参考', 100, 570);
+  
+  // 绘制完成，保存到相册
+  ctx.draw(false, () => {
+    setTimeout(() => {
+      uni.canvasToTempFilePath({
+        canvasId: 'shareCanvas',
+        success: (res) => {
+          uni.saveImageToPhotosAlbum({
+            filePath: res.tempFilePath,
+            success: () => {
+              uni.hideLoading();
+              uni.showToast({ title: '报告已保存到相册', icon: 'success' });
+            },
+            fail: (err) => {
+              uni.hideLoading();
+              if (err.errMsg.includes('auth deny')) {
+                uni.showModal({
+                  title: '需要相册权限',
+                  content: '请允许访问相册以保存报告',
+                  success: (modalRes) => {
+                    if (modalRes.confirm) {
+                      uni.openSetting({});
+                    }
+                  }
+                });
+              } else {
+                uni.showToast({ title: '保存失败', icon: 'none' });
+              }
+            }
+          });
+        },
+        fail: () => {
+          uni.hideLoading();
+          uni.showToast({ title: '生成图片失败', icon: 'none' });
+        }
+      });
+    }, 500);
   });
 };
 </script>
@@ -769,5 +905,16 @@ const saveReport = () => {
   .score-number {
     font-size: 36px;
   }
+}
+/* 隐藏画布容器 */
+.share-canvas-container {
+  position: fixed;
+  top: -9999px;
+  left: -9999px;
+}
+
+.share-canvas {
+  width: 375px;
+  height: 600px;
 }
 </style>

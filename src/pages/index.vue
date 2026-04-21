@@ -169,7 +169,7 @@
             <view class="form-item">
               <view class="form-label">
                 <text class="label-text">标题</text>
-                <text v-if="autoFilled.title" class="label-tag">AI 已填</text>
+                <text v-if="autoFilled.title" class="label-tag">AI 识别</text>
               </view>
               <input 
                 class="form-input" 
@@ -188,7 +188,7 @@
             <view class="form-item">
               <view class="form-label">
                 <text class="label-text">正文</text>
-                <text v-if="autoFilled.content" class="label-tag">AI 已填</text>
+                <text v-if="autoFilled.content" class="label-tag">AI 识别</text>
               </view>
               <textarea 
                 class="form-textarea" 
@@ -261,6 +261,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { diagnoseNote } from '@/api/diagnose.js';
 // 状态管理
 const files = ref<File[]>([]);
 const title = ref('');
@@ -743,48 +744,49 @@ const getApiHealth = async (): Promise<boolean> => {
   }
 };
 
-// 模拟快速识别
+// 真实 AI 识别（替换原来的模拟函数）
 const quickRecognize = async (file: File, slotHint?: string): Promise<any> => {
-  // 模拟 API 调用
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        success: true,
-        slot_type: 'content',
-        category: 'food',
-        title: '好吃的家常菜',
-        content_text: '这是一道非常好吃的家常菜，做法简单，味道鲜美。',
-        summary: '家常菜做法分享',
-        engagement_signal: {
-          likes_visible: 1000,
-          collects_visible: 500,
-          comments_visible: 100,
-          is_high_engagement: true
-        }
-      });
-    }, 1000);
-  });
+  const key = fileKey(file);
+  try {
+    // 调用真实 AI 接口
+    const result = await diagnoseNote({
+      title: title.value || '未命名',
+      content: content.value || '',
+      category: category.value || 'food',
+      coverFilePath: (file as any).path || ''
+    });
+    
+    // 返回 AI 识别和诊断结果
+    return {
+      success: true,
+      slot_type: 'content',
+      category: result.category || 'food',
+      title: result.title || '',
+      content_text: result.content || '',
+      summary: result.content?.slice(0, 100) || '',
+      engagement_signal: {
+        likes_visible: 0,
+        collects_visible: 0,
+        comments_visible: 0,
+        is_high_engagement: false
+      }
+    };
+  } catch (e: any) {
+    return {
+      success: false,
+      slot_type: 'unknown',
+      category: '',
+      title: '',
+      content_text: '',
+      summary: '',
+      error: e.message || '识别失败'
+    };
+  }
 };
 
+// 视频识别（目前复用图片识别逻辑）
 const quickRecognizeVideo = async (file: File): Promise<any> => {
-  // 模拟 API 调用
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        success: true,
-        media_source: 'video',
-        slot_type: 'content',
-        category: 'food',
-        summary: '视频内容：家常菜做法',
-        engagement_signal: {
-          likes_visible: 2000,
-          collects_visible: 1000,
-          comments_visible: 200,
-          is_high_engagement: true
-        }
-      });
-    }, 2000);
-  });
+  return quickRecognize(file);
 };
 
 // 运行识别
